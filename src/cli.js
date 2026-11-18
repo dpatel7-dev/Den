@@ -94,7 +94,8 @@ async function open(target, o) {
     dim(url), '', dim('Keep this window open while you code.'), dim('Ctrl+C closes den.'), '',
   ];
   out('');
-  for (let i = 0; i < Math.max(art.length, text.length); i++) out('  ' + (art[i] || ' '.repeat(26)) + '   ' + (text[i] || ''));
+  const artW = A.vwidth(art[0] || '');
+  for (let i = 0; i < Math.max(art.length, text.length); i++) out('  ' + (art[i] || ' '.repeat(artW)) + '   ' + (text[i] || ''));
 
   let opened = false;
   if (o.open) {

@@ -8,76 +8,63 @@
 <link rel="stylesheet" href="static/den.css">
 </head>
 <body>
-<header>
-  <canvas id="emberTop" width="26" height="17" aria-hidden="true"></canvas>
-  <h1>den <span class="dim">·</span> <span id="folderName"></span></h1>
-  <span id="branch" class="dim wide-only"></span>
-  <span class="rule"></span>
-  <button class="icon narrow-only" id="filesToggle" type="button" title="Show the files">files</button>
-  <button class="icon narrow-only" id="helpToggle" type="button" title="Show Ember">Ember</button>
-  <button class="btn wide-only" id="quickBtn" type="button" title="Find any file by typing part of its name">Find a file <kbd class="mod">⌘P</kbd></button>
-  <button class="btn go" id="runBtn" type="button" disabled>▶ Run</button>
-  <button class="icon" id="menuBtn" type="button" aria-haspopup="menu" title="Everything den can do">☰</button>
-</header>
-
-<main id="main">
-  <section class="box files" id="filesBox" aria-label="Files">
-    <h2>Files</h2>
-    <div class="ftools">
-      <button class="icon" id="newFileBtn" type="button" title="New file (Alt+N)">+ file</button>
-      <button class="icon" id="newDirBtn" type="button" title="New folder">+ folder</button>
-      <span class="grow"></span>
-      <button class="icon" id="binBtn" type="button" title="den's bin: things you deleted">bin</button>
+<div class="sky" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i></div>
+<div class="app" id="app">
+  <header class="top glass" id="top">
+    <div class="brand"><canvas id="emberTop" width="26" height="17" aria-hidden="true"></canvas><b>den</b></div>
+    <button class="folder" id="folderBtn" type="button" title="The folder den has open"><span id="folderName"></span></button>
+    <button class="cmdbar" id="cmdBar" type="button" aria-label="Find a file or a command">
+      <span class="ic" data-icon="search"></span><span class="txt">Find a file, or type <b>&gt;</b> for commands</span><kbd id="cmdKey"></kbd>
+    </button>
+    <div class="acts">
+      <button class="tool" id="tSide" type="button" data-icon="sidebar" title="Show or hide the side bar"></button>
+      <button class="tool" id="tPanel" type="button" data-icon="panel" title="Show or hide the console and terminal"></button>
+      <button class="tool" id="tHelp" type="button" data-icon="helper" title="Show or hide Ember"></button>
+      <button class="run" id="runBtn" type="button" disabled><span class="ic" data-icon="play"></span><span id="runText">Run</span></button>
     </div>
-    <div class="tree" id="tree" role="tree" tabindex="0"></div>
-  </section>
-  <div class="split files" data-split="files"></div>
+  </header>
 
-  <div class="mid" id="mid">
-    <section class="box edbox" id="edBox" aria-label="Editor">
-      <h2 id="edTitle">Welcome</h2>
-      <span class="aside" id="edAside"></span>
-      <div class="tabs" id="tabs" role="tablist"></div>
-      <div class="findbar" id="findbar" hidden>
-        <input id="findQ" placeholder="find in this file" aria-label="Find in this file" autocomplete="off" spellcheck="false">
-        <span class="n" id="findN"></span>
-        <button class="icon" id="findPrev" type="button" title="Previous (Shift+Enter)">↑</button>
-        <button class="icon" id="findNext" type="button" title="Next (Enter)">↓</button>
-        <button class="icon" id="findCase" type="button" aria-pressed="false" title="Match capital letters">Aa</button>
-        <input id="findR" placeholder="replace with" aria-label="Replace with" autocomplete="off" spellcheck="false">
-        <button class="btn" id="findOne" type="button">Replace</button>
-        <button class="btn" id="findAll" type="button">All</button>
-        <button class="icon" id="findX" type="button" title="Close (Esc)">×</button>
-      </div>
-      <div class="banner" id="banner" hidden></div>
-      <div class="panes" id="panes">
-        <div class="editor" id="editor" hidden>
-          <div class="gutter"><div class="gin"></div></div>
-          <div class="view">
-            <div class="layer"><div class="curline"></div><div class="marks"></div><pre class="hl"></pre></div>
-            <div class="complete" hidden></div>
-          </div>
-        </div>
-        <div class="viewer" id="viewer"></div>
-        <div class="pvsplit" id="pvsplit" hidden></div>
-        <div class="preview" id="preview" hidden></div>
-      </div>
-    </section>
-    <div class="split console" data-split="console"></div>
-    <section class="box console" id="conBox" aria-label="Console">
-      <h2>Console</h2>
-      <span class="aside">
-        <button class="icon" id="stopBtn" type="button" hidden title="Stop the program">■ stop</button>
-        <button class="icon" id="clearBtn" type="button" title="Clear the console">clear</button>
-      </span>
-      <div class="out" id="out" aria-live="polite"></div>
-      <form class="cmd" id="cmdForm"><span>›</span><input id="cmd" autocomplete="off" spellcheck="false" aria-label="Type a command, or an answer for a running program"></form>
-    </section>
-  </div>
-  <div class="split helper" data-split="helper"></div>
+  <nav class="rail" id="rail" aria-label="Views">
+    <button type="button" data-view="files" data-icon="files" title="Files" aria-label="Files"></button>
+    <button type="button" data-view="search" data-icon="search" title="Search every file" aria-label="Search"></button>
+    <button type="button" data-view="git" data-icon="git" title="Changes (git)" aria-label="Changes"><span class="count" id="gitCount" hidden></span></button>
+    <button type="button" data-view="outline" data-icon="outline" title="Outline of this file" aria-label="Outline"></button>
+    <span class="grow"></span>
+    <button type="button" id="emberRail" data-icon="spark" title="Ember (your helper)" aria-label="Ember"></button>
+    <button type="button" id="settingsRail" data-icon="gear" title="Settings" aria-label="Settings"></button>
+  </nav>
 
-  <section class="box helper" id="helpBox" aria-label="Ember">
-    <h2>Ember</h2>
+  <aside class="side glass" id="side" aria-label="Side bar">
+    <div class="side-head"><h2 id="sideTitle">Files</h2><span class="grow"></span><span class="side-acts" id="sideActs"></span></div>
+    <div class="side-body" id="sideBody"></div>
+  </aside>
+  <div class="split v" data-split="side"></div>
+
+  <main class="work" id="work">
+    <div class="groups" id="groups"></div>
+    <div class="split h" data-split="panel"></div>
+    <section class="panel glass" id="panel" aria-label="Console, terminal and problems">
+      <div class="ptabs" role="tablist" id="ptabs">
+        <button type="button" role="tab" data-p="console"><span class="ic" data-icon="console"></span>Console</button>
+        <button type="button" role="tab" data-p="terminal"><span class="ic" data-icon="terminal"></span>Terminal</button>
+        <button type="button" role="tab" data-p="problems"><span class="ic" data-icon="problem"></span>Problems <span class="count" id="probCount" hidden></span></button>
+        <span class="grow"></span>
+        <span class="pacts" id="pacts"></span>
+      </div>
+      <div class="pbody" data-pb="console">
+        <div class="out" id="out" aria-live="polite"></div>
+        <form class="cmd" id="cmdForm"><span>›</span><input id="cmd" autocomplete="off" spellcheck="false" aria-label="Type a command, or an answer for a running program"></form>
+      </div>
+      <div class="pbody" data-pb="terminal" hidden>
+        <div class="tterms" id="tterms"></div>
+        <div class="tbox" id="tbox"></div>
+      </div>
+      <div class="pbody" data-pb="problems" hidden><div class="plist" id="plist"></div></div>
+    </section>
+  </main>
+  <div class="split v" data-split="helper"></div>
+
+  <aside class="helper glass" id="helpBox" aria-label="Ember">
     <div class="ember"><canvas id="emberBig" width="26" height="17" aria-hidden="true"></canvas><div class="bubble" id="bubble" aria-live="polite"></div></div>
     <div class="htabs" role="tablist">
       <button type="button" role="tab" id="tabWhat" aria-selected="true">What's this?</button>
@@ -90,26 +77,36 @@
       <textarea id="askQ" rows="2" placeholder="Ask Ember anything about your code" aria-label="Your question for Ember"></textarea>
       <div class="send"><span class="grow" id="askModel"></span><button class="btn go" type="submit" id="askGo">Ask</button></div>
     </form>
-  </section>
-</main>
+  </aside>
 
-<footer id="status">
-  <span id="stLang"></span>
-  <span id="stPos"></span>
-  <span id="stIndent" class="wide-only"></span>
-  <span id="stSaved"></span>
-  <span class="grow" id="stMsg"></span>
-  <button type="button" id="stKeys" class="wide-only">keys <kbd>?</kbd></button>
-  <button type="button" id="stTheme" title="Light or dark">◐</button>
-</footer>
+  <footer class="status" id="status">
+    <button type="button" class="pill" id="stBranch" hidden></button>
+    <button type="button" class="pill" id="stSync" hidden></button>
+    <button type="button" class="pill" id="stProblems"></button>
+    <span class="grow" id="stMsg"></span>
+    <button type="button" class="pill" id="stPos"></button>
+    <button type="button" class="pill" id="stIndent"></button>
+    <button type="button" class="pill" id="stLang"></button>
+    <span class="pill quiet" id="stSaved"></span>
+    <button type="button" class="pill" id="stAi" title="Which AI Ember uses"></button>
+    <button type="button" class="pill" id="stTheme" title="Colours"></button>
+    <button type="button" class="pill" id="stKeys" title="Keys">?</button>
+  </footer>
+</div>
 
 <div class="modal" id="modal" hidden></div>
 <div class="toast" id="toast" hidden></div>
+<div class="tip" id="tip" hidden></div>
+<div class="drop" id="drop" hidden><div><span data-icon="upload"></span><p>Drop to add these files to <b id="dropWhere"></b></p></div></div>
 
 <script>window.DEN = __CONFIG__;</script>
+<script src="static/icons.js"></script>
 <script src="static/highlight.js"></script>
 <script src="static/help.js"></script>
+<script src="static/diff.js"></script>
 <script src="static/editor.js"></script>
+<script src="static/term.js"></script>
 <script src="static/den.js"></script>
+<script src="static/views.js"></script>
 </body>
 </html>

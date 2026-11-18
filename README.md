@@ -1,29 +1,36 @@
 # den
 
-A cozy place to write code. Type `den` in a terminal and your project opens in
-your browser as a full code editor: your files on the left, your code in the
-middle, a console underneath, and Ember the fox on the right, explaining things
-in plain words.
+A code editor that opens in your browser, made for learning. Type `den` in a
+terminal and your project opens: your files on the left, your code in the
+middle (one file, or two side by side), the console, terminals and problems
+underneath, and Ember the fox on the right, explaining things in plain words.
 
 ![den, with a web page open next to its live preview](docs/den.png)
 
-It's made for people who are learning, so nothing is hidden behind settings:
+It does what big editors do, without the settings maze:
 
-- **Run** your code with one button. Python, JavaScript, and about a dozen
-  more. What it prints shows in the console, and if it asks a question
-  (`input()`), you answer in the box underneath.
-- **When something breaks, Ember tells you what it means.** "Text and a number
-  got mixed: turn the number into text first with `str(...)`", with a button
-  that jumps to the right line. Missing a module? One button installs it.
-- **"What's this?"** Put your cursor on a word like `for`, `def`,
-  `querySelector` or `padding` and Ember explains it, with a tiny example.
-- **Preview** web pages as you type, Markdown notes, SVG pictures and CSV
-  tables. A web page's `console.log` and its errors show in den's console too.
-- **Ask Ember** anything about your code. She can see the file you have open
-  and what you selected, and answers with code you can **Put in file** (undo
-  always works). She uses the free AI you set up in Tree of Thought.
+- **Run** your code with one button (Python, JavaScript and about a dozen
+  more). When something breaks, Ember says what it means, in plain words, and
+  can **fix it with you**: she shows exactly what would change before anything does.
+- **Mistakes show as you type.** A red squiggle under the problem, the line
+  number in red, and the reason when you point at it (Python, JavaScript, JSON
+  and CSS).
+- **Real terminals**, built in: colours, arrow keys, `python3` on its own,
+  `pip install`, `git`, anything.
+- **Search and replace across every file**, with whole-word and pattern options.
+- **Changes (git)**: see what changed since your last save point, line by
+  line, commit with one button (Ember can write the message), and push to GitHub.
+- **Two files side by side**, a map of the whole file, indent lines, matching
+  brackets, other uses of the word you're on, and a path bar that shows which
+  function you're in.
+- **Live previews** of web pages, Markdown, SVG pictures and CSV tables.
+- **Start from an example**: a web page, a Python program, a quiz, an arcade
+  game you can play right away, or notes.
+- **Edit with Ember** (⌘E): say what you want ("add a score that goes up")
+  and look at the change before you accept it.
 - **Nothing gets lost.** den saves as you type, keeps earlier versions of every
-  file, and deleting only moves things to den's bin, so you can put them back.
+  file, and deleting only moves things to den's bin.
+- Five colour themes (Ember, Dusk, Moss, Daylight, Frost) on see-through panes.
 
 Part of the same family as [gossip](https://github.com/dpatel7-dev/gossip),
 [Tree of Thought](https://github.com/dpatel7-dev/Tree-Of-Thought),
@@ -66,32 +73,60 @@ installs nothing else.
 4. den opens in its own window (or a browser tab). Keep the terminal open
    while you code: it's what den runs on. **Ctrl+C** in the terminal closes den.
 
-Then:
-
-- **Make a file:** press **+ file** at the top of the Files list. Name it
-  `something.py` for Python, `index.html` for a web page, or `notes.md` for notes.
-  An empty file? Ember offers a small example to start from.
-- **Run it:** press **▶ Run** (or **⌘Enter** on a Mac, **Ctrl+Enter** on
-  Windows). For a web page the button says **Preview** instead.
-- **Find things:** **⌘P** finds a file by name, **⌘⇧F** searches every file,
-  **⌘F** finds (and replaces) in the file you're in.
-- **Everything else:** press **☰** (or **⌘K**) and type what you want, like
-  "rename", "light" or "earlier versions". Press **?** to see all the keys.
+The first page has examples to start from. Pick one and it's ready to run.
 
 On Windows, use **Ctrl** wherever this says **⌘**.
 
+### Finding your way around
+
+| Where | What it's for |
+| --- | --- |
+| The bar at the top | **⌘P** finds a file by name. Type **>** for every command, **@** for the functions and headings in your file, **:** for a line number. |
+| **Run** (top right) | Runs the file you're on (**⌘Enter**). For a web page it shows the preview. |
+| The buttons on the left | **Files**, **Search** (in every file), **Changes** (git) and **Outline** (this file's functions). Click the one that's open to hide the side bar. |
+| Under your code | **Console** (what your program prints, and a box to type commands), **Terminal** (**Ctrl+`**) and **Problems** (mistakes den spotted). |
+| The right | Ember: **What's this?** explains the word your cursor is on and any error; **Ask** answers questions about your code. |
+| The bottom line | Click the line number to jump to a line, the language to change colours, the branch to switch it, the mistakes count to see them. |
+
+Handy keys: **⌘\\** two files side by side, **⌘D** select this word (again:
+the next place it's used), **Alt+↑/↓** move lines, **⌘/** comment lines,
+**F8** next mistake, **⌘E** edit with Ember. Press **?** for all of them.
+
+### Files
+
+Right-click a file or folder for everything you can do with it. Drag files
+onto a folder to move them there, or drop files and folders from your computer
+onto den to add them.
+
+### Changes (git)
+
+git keeps save points of your project, called commits. In **Changes**:
+
+1. If den says so, press **Start tracking** (once per project).
+2. Change some files. They're listed here, and the editor shows coloured bars
+   beside the lines that changed (green: new, blue: changed, red: removed).
+   Click a file to see exactly what changed.
+3. Write a few words about what you did (or press **Write it for me**), then
+   **Commit**.
+4. **Put on GitHub** connects the project to a repository on github.com, and
+   the arrows send and fetch commits.
+
+Undoing changes is safe: new files go to den's bin, and den keeps a copy of
+the rest in their earlier versions.
+
 ## Ember's AI (optional, free)
 
-The "What's this?" help and the error explanations work without any AI. To
-also ask Ember questions, set up free AI once in Tree of Thought:
+The "What's this?" help, the mistake squiggles and the error explanations work
+without any AI. To also ask Ember questions, and have her edit code with you,
+set up free AI once in Tree of Thought:
 
 1. Install Tree of Thought (type `pca` and pick it).
 2. In a terminal, type `tot free` and follow the steps (it's copy and paste).
 3. In den, open the **Ask** tab. That's it.
 
 The AI runs in the cloud, so nothing heavy runs on your computer. Ember only
-suggests: your files only change when you press **Put in file**, and **⌘Z**
-undoes that.
+suggests: when she writes code, **Apply** shows you exactly what would change
+(green added, red removed) before anything does, and **⌘Z** undoes it.
 
 ## Running code
 
@@ -120,7 +155,8 @@ the console also runs any command, like `pip install requests` or `npm install`.
   are refused too).
 - Your web pages preview from a separate address, so a page can't reach den's
   controls.
-- It never runs anything unless you press Run or type a command.
+- It never runs anything unless you press Run, type a command, or use a
+  terminal. Terminals are closed when no den page has been open for a few minutes.
 - Deleting moves things to den's bin (`~/.den/bin`), and every save keeps the
   version before it (`~/.den/history`, the newest 25 per file).
 
@@ -143,12 +179,26 @@ den help             this list
 ## For developers
 
 Zero dependencies: Node.js 18 or newer, nothing from npm. The page is plain
-HTML, CSS and JavaScript in `web/` (the editor is a textarea under a coloured
-copy of the text; `web/highlight.js` colours about 25 languages).
+HTML, CSS and JavaScript in `web/`.
 
 ```sh
 node bin/den.js ~/some/project     # try it
 node --test                        # the tests
 ```
+
+| File | What it does |
+| --- | --- |
+| `src/server.js` | the local server: files, running, git, terminals, checks, Ember |
+| `src/files.js` | reading and saving inside the folder, the bin, earlier versions, search and replace |
+| `src/git.js` | git, through the real `git` program |
+| `src/term.js` | terminals (a real pty from the `script` program on Mac and Linux) |
+| `src/check.js` | spotting mistakes with Python's and Node's own checkers |
+| `web/den.js` | the page: groups of tabs, saving, running, previews, Ember |
+| `web/views.js` | files, search, changes, outline, problems, terminals |
+| `web/editor.js` | the editor (a textarea under a coloured copy, plus the minimap and the rest) |
+| `web/term.js` | the terminal screen (colours, cursor movement, full-screen programs) |
+| `web/diff.js` | comparing two versions line by line |
+| `web/highlight.js` | colouring about 25 languages |
+| `web/icons.js` | the icons (drawn, never emoji) |
 
 MIT licence.

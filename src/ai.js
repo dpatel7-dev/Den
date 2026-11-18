@@ -99,4 +99,25 @@ async function ask({ model, question, context = {}, history = [], onText, signal
   throw last;
 }
 
-module.exports = { models, current, ask, prompt, keyOf, local, SYSTEM, totHome };
+/** One answer with a job-specific instruction (commit messages and the like), moving on when a free model is busy. */
+async function complete({ model, system, user, signal }) {
+  const keys = readJson(path.join(totHome(), 'keys.json'), {});
+  const all = model.free ? await models() : [];
+  const others = all.filter((m) => m.free && !local(m) && keyOf(m) !== keyOf(model)).sort((a, b) => (b.power || 0) - (a.power || 0));
+  let last;
+  for (const m of [model, ...others].slice(0, 4)) {
+    try {
+      const r = await P.chat({ provider: m.provider, key: keys[m.provider], model: m.id, system, messages: [{ role: 'user', content: user }], signal });
+      return { text: String(r.text || ''), model: m };
+    } catch (e) {
+      last = e;
+      const s = Number(e.status) || 0;
+      if (e.name === 'AbortError' || !(s === 429 || s >= 500 || (!s && /couldn't reach|cut off/i.test(e.message)))) throw e;
+    }
+  }
+  throw last;
+}
+
+const COMMIT = `You write git commit messages. Reply with one line only: what changed, in plain words, in the imperative ("Add a score counter", "Fix the jump on small screens"). At most 60 characters. No quotes, no full stop, no prefix like "feat:".`;
+
+module.exports = { models, current, ask, complete, prompt, keyOf, local, SYSTEM, COMMIT, totHome };

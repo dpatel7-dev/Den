@@ -42,8 +42,31 @@ const FRAMES = {
   }),
 };
 
-/** Ember for the terminal: lines of text. */
+// A smaller Ember for terminals that draw thin lines through half-blocks
+// (macOS Terminal): each pixel is a whole cell there, so she stays crisp.
+const MINI = [
+  'K.........K.',
+  'KK.......KK.',
+  'OWO.....OWO.',
+  'OOOOOOOOOOO.',
+  'OEOOOOOOOEO.',
+  'WWWOONOOWWW.',
+  '.WWWWWWWWW..',
+  '..OOWWWOO.OW',
+  '..OOOOOOOOWW',
+  '..KK...KK...',
+];
+const MINI_FRAMES = {
+  idle: MINI,
+  blink: swap(MINI, { 4: 'OOOOOOOOOOO.' }),
+  happy: swap(MINI, { 4: 'EOEOOOOOEOE.' }),
+  oops: swap(MINI, { 0: 'K.........KS', 1: 'KK.......KKS' }),
+  tail: swap(MINI, { 7: '..OOWWWOO.O.', 8: '..OOOOOOOOOW' }),
+};
+
+/** Ember for the terminal: lines of text (whole blocks in macOS Terminal). */
 function draw(frame = 'idle', bg = null) {
+  if (S.style() === 'blocky') return S.drawBlocky(MINI_FRAMES[frame] || MINI, INK, { bg });
   return S.draw(FRAMES[frame] || BASE, INK, { bg });
 }
 
@@ -52,4 +75,4 @@ function web() {
   return { ink: INK, frames: FRAMES };
 }
 
-module.exports = { INK, FRAMES, draw, web };
+module.exports = { INK, FRAMES, MINI, draw, web };

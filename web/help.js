@@ -213,7 +213,29 @@
     return null;
   }
 
-  var api = { GLOSSARY: GLOSSARY, STARTERS: STARTERS, explain: explain, place: place };
+  // Little projects to start from (the welcome page's examples): { file: text }
+  var TEMPLATES = {
+    web: {
+      'index.html': '<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="utf-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1">\n  <title>My page</title>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <main>\n    <h1>Hello!</h1>\n    <p>This is my page. Change this text and watch the preview.</p>\n    <button id="clicker">Click me</button>\n    <p id="count">No clicks yet.</p>\n  </main>\n  <script src="script.js"></script>\n</body>\n</html>\n',
+      'style.css': 'body {\n  font-family: system-ui, sans-serif;\n  background: #fdf6ee;\n  color: #2b2118;\n  margin: 0;\n}\n\nmain {\n  max-width: 40rem;\n  margin: 4rem auto;\n  padding: 0 1.5rem;\n}\n\nh1 {\n  color: #e0662f;\n}\n\nbutton {\n  font: inherit;\n  padding: 0.6rem 1.2rem;\n  border: 0;\n  border-radius: 999px;\n  background: #e0662f;\n  color: white;\n  cursor: pointer;\n}\n',
+      'script.js': '// This runs in the page. console.log() shows in den\'s console.\nconst button = document.getElementById("clicker");\nconst count = document.getElementById("count");\nlet clicks = 0;\n\nbutton.addEventListener("click", () => {\n  clicks = clicks + 1;\n  count.textContent = "Clicked " + clicks + " times.";\n  console.log("clicked", clicks);\n});\n',
+    },
+    py: {
+      'main.py': '# A tiny Python program. Press Run to try it.\n\nname = input("What is your name? ")\nprint("Hi, " + name + "!")\n\nage = int(input("How old are you? "))\nprint("In ten years you will be", age + 10)\n\nfor n in range(1, 4):\n    print(n, "x 7 =", n * 7)\n',
+    },
+    quiz: {
+      'quiz.py': '# A quiz game. Add your own questions to the list!\n\nquestions = [\n    ("What is 7 x 8?", "56"),\n    ("What colour do you get by mixing blue and yellow?", "green"),\n    ("How many legs does a spider have?", "8"),\n]\n\nscore = 0\nfor question, answer in questions:\n    guess = input(question + " ")\n    if guess.strip().lower() == answer:\n        print("Right!")\n        score = score + 1\n    else:\n        print("Not quite. It was", answer)\n\nprint("You got", score, "out of", len(questions))\n',
+    },
+    game: {
+      'index.html': '<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="utf-8">\n  <title>Star catcher</title>\n  <style>\n    body { margin: 0; background: #14101c; display: grid; place-items: center; height: 100vh; font-family: system-ui, sans-serif; color: #f4ecff; }\n    canvas { background: #1f1830; border-radius: 12px; }\n  </style>\n</head>\n<body>\n  <div>\n    <p>Use the arrow keys to catch the stars. Score: <b id="score">0</b></p>\n    <canvas id="game" width="480" height="320"></canvas>\n  </div>\n  <script src="game.js"></script>\n</body>\n</html>\n',
+      'game.js': '// Star catcher: move the square with the arrow keys and catch the stars.\nconst canvas = document.getElementById("game");\nconst ctx = canvas.getContext("2d");\nconst scoreText = document.getElementById("score");\n\nconst player = { x: 220, y: 280, size: 26, speed: 5 };\nlet star = newStar();\nlet score = 0;\nconst keys = {};\n\naddEventListener("keydown", (e) => { keys[e.key] = true; });\naddEventListener("keyup", (e) => { keys[e.key] = false; });\n\nfunction newStar() {\n  return { x: 20 + Math.random() * 440, y: -10, speed: 2 + Math.random() * 2 };\n}\n\nfunction update() {\n  if (keys.ArrowLeft) player.x -= player.speed;\n  if (keys.ArrowRight) player.x += player.speed;\n  player.x = Math.max(0, Math.min(canvas.width - player.size, player.x));\n\n  star.y += star.speed;\n  const caught = star.y > player.y && star.x > player.x && star.x < player.x + player.size;\n  if (caught) {\n    score = score + 1;\n    scoreText.textContent = score;\n    star = newStar();\n  } else if (star.y > canvas.height) {\n    star = newStar();\n  }\n}\n\nfunction draw() {\n  ctx.clearRect(0, 0, canvas.width, canvas.height);\n  ctx.fillStyle = "#ff8a4c";\n  ctx.fillRect(player.x, player.y, player.size, player.size);\n  ctx.fillStyle = "#ffd86b";\n  ctx.beginPath();\n  ctx.arc(star.x, star.y, 7, 0, Math.PI * 2);\n  ctx.fill();\n}\n\nfunction loop() {\n  update();\n  draw();\n  requestAnimationFrame(loop);\n}\nloop();\n',
+    },
+    notes: {
+      'notes.md': '# My notes\n\nWrite anything here. Press **Preview** to see it formatted.\n\n## To do\n\n- [x] Open den\n- [ ] Make something\n- [ ] Show someone\n\n## Ideas\n\n1. A game\n2. A website about my hobby\n\n> Tip: a line starting with # is a heading.\n',
+    },
+  };
+
+  var api = { GLOSSARY: GLOSSARY, STARTERS: STARTERS, TEMPLATES: TEMPLATES, explain: explain, place: place };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.HELP = api;
 })(this);

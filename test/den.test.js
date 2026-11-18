@@ -20,6 +20,10 @@ const { Den, withListener } = require('../src/server');
 const HL = require('../web/highlight.js');
 const HELP = require('../web/help.js');
 const { parse } = require('../src/cli');
+const { Git } = require('../src/git');
+const { Terms } = require('../src/term');
+const { check } = require('../src/check');
+const DIFF = require('../web/diff.js');
 
 function project() {
   const root = mk('den-proj-');
@@ -320,4 +324,122 @@ test('the preview listener keeps line numbers, and the command line', () => {
   assert.ok(withListener('<p>no head</p>').startsWith('<script>'));
   assert.deepEqual(parse(['my folder', '--tab', '--port', '9000']), { args: ['my folder'], tab: true, open: true, port: 9000 });
   assert.equal(parse(['--no-open']).open, false);
+});
+
+test('search with options, replace everywhere, files dropped in', () => {
+  const root = project();
+  fs.writeFileSync(path.join(root, 'names.py'), 'name = 1\nnames = 2\nprint(name)\n');
+  const F = new Folder(root);
+  assert.equal(F.search('name', { word: true, include: '*.py' }).hits.length, 2);
+  assert.equal(F.search('nam(e)s?', { regex: true, include: '*.py' }).hits.length, 3);
+  assert.equal(F.search('find me', { include: 'src/**' }).hits.length, 0);
+  assert.throws(() => F.search('(', { regex: true }), /pattern/);
+  const r = F.replace('name', 'title', { word: true, include: '*.py' });
+  assert.deepEqual(r, { count: 2, files: ['names.py'] });
+  assert.equal(fs.readFileSync(path.join(root, 'names.py'), 'utf8'), 'title = 1\nnames = 2\nprint(title)\n');
+  assert.equal(F.history('names.py').length, 1, 'the old version is kept');
+  F.replace('(\\w+) = (\\d)', '$2 = $1', { regex: true, include: '*.py' });
+  assert.match(fs.readFileSync(path.join(root, 'names.py'), 'utf8'), /^1 = title\n2 = names/);
+  // a dropped file never replaces one that's there
+  assert.equal(F.upload('src', 'main.js', Buffer.from('x').toString('base64')).path, 'src/main (2).js');
+  assert.equal(F.upload('', 'pic.txt', Buffer.from('hey').toString('base64')).path, 'pic.txt');
+  assert.throws(() => F.upload('../', 'x.txt', ''), /outside/);
+  assert.throws(() => F.upload('', '..', ''), /name/);
+});
+
+test('changes with git: status, the old version, commit, undo changes safely', { skip: !which('git') }, async () => {
+  const root = mk('den-git-');
+  for (const [k, v] of Object.entries({ GIT_AUTHOR_NAME: 'T', GIT_AUTHOR_EMAIL: 't@example.com', GIT_COMMITTER_NAME: 'T', GIT_COMMITTER_EMAIL: 't@example.com' })) process.env[k] = v;
+  const F = new Folder(root);
+  const G = new Git(F);
+  assert.equal((await G.status()).repo, false);
+  await G.init();
+  fs.writeFileSync(path.join(root, 'a.py'), 'one\ntwo\n');
+  let st = await G.status();
+  assert.equal(st.repo, true);
+  assert.deepEqual(st.files.map((f) => [f.path, f.kind]), [['a.py', 'new']]);
+  await assert.rejects(G.commit(''), /Write a few words/);
+  const c = await G.commit('first');
+  assert.ok(c.hash && c.all, 'nothing staged: everything is committed');
+  assert.equal((await G.status()).files.length, 0);
+  fs.writeFileSync(path.join(root, 'a.py'), 'one\nTWO\nthree\n');
+  fs.writeFileSync(path.join(root, 'b.txt'), 'new file\n');
+  assert.equal(await G.base('a.py'), 'one\ntwo\n');
+  assert.equal(await G.base('b.txt'), null);
+  st = await G.status();
+  assert.deepEqual(st.files.map((f) => f.path).sort(), ['a.py', 'b.txt']);
+  await G.stage(['a.py']);
+  assert.ok((await G.status()).files.find((f) => f.path === 'a.py').staged);
+  await G.unstage(['a.py']);
+  assert.ok(!(await G.status()).files.find((f) => f.path === 'a.py').staged);
+  // undoing changes: the new file goes to den's bin, the changed one is kept in earlier versions
+  const d = await G.discard(['a.py', 'b.txt']);
+  assert.equal(d.binned.length, 1);
+  assert.ok(!fs.existsSync(path.join(root, 'b.txt')));
+  assert.equal(F.bin()[0].path, 'b.txt');
+  assert.equal(fs.readFileSync(path.join(root, 'a.py'), 'utf8'), 'one\ntwo\n');
+  assert.equal(F.version('a.py', F.history('a.py')[0].id), 'one\nTWO\nthree\n');
+  const log = await G.log();
+  assert.equal(log.items[0].subject, 'first');
+  await G.checkout('try-it', true);
+  assert.equal((await G.branches()).current, 'try-it');
+  await assert.rejects(G.checkout('--evil'), /Branch names/);
+  await assert.rejects(G.push(), /isn't connected/);
+  await assert.rejects(G.connect('not a url'), /address/);
+  // what the line bars show
+  const m = DIFF.marks('one\ntwo\n', 'one\nTWO\nthree\n');
+  assert.deepEqual({ ...m.map }, { 1: 'mod', 2: 'add' });
+});
+
+test('terminals: a real one, typing, resizing, closing', { skip: process.platform === 'win32' || !which('script') }, async () => {
+  const T = new Terms(mk('den-term-'));
+  let out = '';
+  const ended = new Promise((resolve) => T.on('event', (e) => { if (e.t === 'term') out += e.d; if (e.t === 'term-end') resolve(e); }));
+  const prevShell = process.env.SHELL;
+  process.env.SHELL = '/bin/sh';
+  const { id, pty } = T.open({ cols: 90, rows: 20 });
+  process.env.SHELL = prevShell;
+  assert.equal(pty, true);
+  const wait = (re, ms = 4000) => new Promise((resolve, reject) => { const t0 = Date.now(); const tick = () => { if (re.test(out)) resolve(); else if (Date.now() - t0 > ms) reject(new Error('never saw ' + re + ' in ' + JSON.stringify(out))); else setTimeout(tick, 30); }; tick(); });
+  await new Promise((r) => setTimeout(r, 400));
+  T.input(id, 'stty size; echo made-$((6*7))\r');
+  await wait(/20 90[\s\S]*made-42/);
+  assert.ok(!/7770/.test(out), "den's own setup line is never shown");
+  assert.equal(T.resize(id, 120, 33), true);
+  T.input(id, 'stty size\r');
+  await wait(/33 120/);
+  assert.ok(T.info()[0].replay.includes('made-42'), 'a reloaded page can show what was there');
+  T.input(id, 'exit\r');
+  await ended;
+  assert.equal(T.info().length, 0);
+});
+
+test('spotting mistakes as you type', async () => {
+  assert.deepEqual(await check('ok.js', 'console.log(1)\n', 'javascript'), []);
+  const js = await check('bad.js', 'const a = {\n  b: 1,\n\nfunction x() {}\n', 'javascript');
+  assert.equal(js.length, 1);
+  assert.equal(js[0].line, 4);
+  const mod = await check('m.js', 'import x from "y";\nconst a = ;\n', 'javascript');
+  assert.equal(mod[0].line, 2);
+  assert.equal((await check('a.json', '{\n "a": 1,\n}', 'json'))[0].line, 3);
+  const css = await check('a.css', 'body {\n color: red;\n', 'css');
+  assert.match(css[0].msg, /never closed/);
+  assert.equal(await check('a.md', '# hi', 'markdown'), null);
+  if (which('python3')) {
+    const py = await check('a.py', 'def f(:\n  pass\n', 'python');
+    assert.equal(py[0].line, 1);
+    assert.deepEqual(await check('b.py', 'print(1)\n', 'python'), []);
+  }
+});
+
+test('the page has every piece it needs, and the pieces fit together', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'web', 'den.html'), 'utf8');
+  for (const m of html.matchAll(/static\/([a-z]+\.(?:js|css))/g)) assert.ok(fs.existsSync(path.join(__dirname, '..', 'web', m[1])), m[1]);
+  // no emoji anywhere in what den shows
+  for (const f of fs.readdirSync(path.join(__dirname, '..', 'web'))) {
+    const text = fs.readFileSync(path.join(__dirname, '..', 'web', f), 'utf8');
+    assert.ok(!/[\u{1F300}-\u{1FAFF}]/u.test(text), `${f} has an emoji in it`);
+  }
+  // the examples on the welcome page are all there
+  for (const id of ['web', 'py', 'quiz', 'game', 'notes']) assert.ok(Object.keys(HELP.TEMPLATES[id]).length, id);
 });

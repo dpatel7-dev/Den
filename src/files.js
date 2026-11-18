@@ -279,16 +279,23 @@ class Folder {
     return path.join(home(), 'history', this.id, hash(this.rel(this.abs(rel))).slice(0, 24));
   }
 
-  _remember(rel, buf) {
+  _remember(rel, buf, always = false) {
     const dir = this._histDir(rel);
     fs.mkdirSync(dir, { recursive: true });
     const last = this.history(rel)[0];
     // a burst of saves (autosave) keeps one version a minute
-    if (last && Date.now() - last.at < 60000) return;
+    if (!always && last && Date.now() - last.at < 60000) return;
+    if (last && last.at >= Date.now()) return; // (two in the same millisecond)
     fs.writeFileSync(path.join(dir, `${Date.now()}.txt`), buf);
     fs.writeFileSync(path.join(dir, 'path.txt'), this.rel(this.abs(rel)));
     const all = fs.readdirSync(dir).filter((f) => /^\d+\.txt$/.test(f)).sort();
     for (const f of all.slice(0, Math.max(0, all.length - KEEP))) fs.rmSync(path.join(dir, f), { force: true });
+  }
+
+  /** Keep the file as it is right now among its earlier versions (before something replaces it). */
+  remember(rel) {
+    const buf = fs.readFileSync(this.abs(rel));
+    if (buf.length) this._remember(rel, buf, true);
   }
 
   history(rel) {
@@ -309,37 +316,86 @@ class Folder {
   }
 
   // ── search ────────────────────────────────────────────────────────────
-  /** Find words in every text file. Results: [{ path, line, col, text }] */
-  search(q, { limit = 400, caseSensitive = false } = {}) {
-    const want = String(q || '');
-    if (!want.trim()) return { hits: [], files: 0, more: false };
-    const needle = caseSensitive ? want : want.toLowerCase();
+  /**
+   * Find text in every text file. Options: caseSensitive, word (whole words
+   * only), regex (q is a pattern), include ("*.py, src/**": only those files).
+   * Results: [{ path, line, col, len, text, at }]
+   */
+  search(q, { limit = 400, caseSensitive = false, word = false, regex = false, include = '' } = {}) {
+    const re = pattern(q, { caseSensitive, word, regex });
+    if (!re) return { hits: [], files: 0, more: false };
+    const only = globs(include);
     const hits = [];
     let files = 0;
     for (const rel of this.files(8000)) {
-      if (kindOf(rel)) continue;
-      let buf;
-      try {
-        const full = path.join(this.root, rel);
-        if (fs.statSync(full).size > 1024 * 1024) continue;
-        buf = fs.readFileSync(full);
-      } catch { continue; }
-      const text = asText(buf);
+      if (kindOf(rel) || (only && !only.some((g) => g.test(rel)))) continue;
+      const text = this._text(rel);
       if (text === null) continue;
-      const hay = caseSensitive ? text : text.toLowerCase();
-      if (!hay.includes(needle)) continue;
+      re.lastIndex = 0;
+      if (!re.test(text)) continue;
       files++;
       const lines = text.split('\n');
       for (let i = 0; i < lines.length; i++) {
-        const l = caseSensitive ? lines[i] : lines[i].toLowerCase();
-        const col = l.indexOf(needle);
-        if (col < 0) continue;
+        re.lastIndex = 0;
+        const m = re.exec(lines[i]);
+        if (!m) continue;
+        const col = m.index;
         const from = Math.max(0, col - 40);
-        hits.push({ path: rel, line: i + 1, col: col + 1, text: (from ? '…' : '') + lines[i].slice(from, from + 160).replace(/\r$/, ''), at: col - from + (from ? 1 : 0) });
+        hits.push({ path: rel, line: i + 1, col: col + 1, len: m[0].length, text: (from ? '…' : '') + lines[i].slice(from, from + 200).replace(/\r$/, ''), at: col - from + (from ? 1 : 0) });
         if (hits.length >= limit) return { hits, files, more: true };
       }
     }
     return { hits, files, more: false };
+  }
+
+  _text(rel) {
+    try {
+      const full = path.join(this.root, rel);
+      if (fs.statSync(full).size > 1024 * 1024) return null;
+      return asText(fs.readFileSync(full));
+    } catch { return null; }
+  }
+
+  /** Replace in every file that matches (each file's old text is kept in its earlier versions). */
+  replace(q, withText, { caseSensitive = false, word = false, regex = false, include = '', paths = null } = {}) {
+    const re = pattern(q, { caseSensitive, word, regex });
+    if (!re) throw fail('bad', 'Type what to find first.');
+    const only = globs(include);
+    const want = Array.isArray(paths) ? new Set(paths) : null;
+    let count = 0;
+    const changed = [];
+    for (const rel of this.files(8000)) {
+      if (kindOf(rel) || (only && !only.some((g) => g.test(rel))) || (want && !want.has(rel))) continue;
+      const text = this._text(rel);
+      if (text === null) continue;
+      re.lastIndex = 0;
+      if (!re.test(text)) continue;
+      let n = 0;
+      re.lastIndex = 0;
+      const crlf = /\r\n/.test(text);
+      const body = crlf ? text.replace(/\r\n/g, '\n') : text;
+      const out = body.replace(re, (...m) => { n++; return regex ? expand(String(withText), m) : String(withText); });
+      if (!n) continue;
+      this._remember(rel, fs.readFileSync(path.join(this.root, rel)), true);
+      this.save(rel, out, { eol: crlf ? '\r\n' : '\n', bom: text.charCodeAt(0) === 0xfeff });
+      count += n;
+      changed.push(rel);
+    }
+    return { count, files: changed };
+  }
+
+  /** A file dropped onto den from your computer. Never replaces: a taken name gets (2). */
+  upload(dir, name, base64) {
+    const clean = String(name || '').replace(/[\\/]/g, '_').trim();
+    if (!clean || clean === '.' || clean === '..' || /[<>:"|?*\u0000-\u001f]/.test(clean)) throw fail('bad_name', `${name} isn't a name den can use.`);
+    const folder = this.abs(dir || '');
+    let target = path.join(folder, clean);
+    this.abs(this.rel(target));
+    const e = path.extname(clean);
+    for (let n = 2; fs.existsSync(target); n++) target = path.join(folder, `${path.basename(clean, e)} (${n})${e}`);
+    fs.mkdirSync(folder, { recursive: true });
+    fs.writeFileSync(target, Buffer.from(String(base64 || ''), 'base64'), { flag: 'wx' });
+    return { path: this.rel(target) };
   }
 
   /** The git branch, if this folder is a git project. */
@@ -354,4 +410,29 @@ class Folder {
   }
 }
 
-module.exports = { Folder, home, kindOf, mimeOf, ext, asText, HEAVY, HIDDEN, TEXT_MAX };
+/** The search as a RegExp (global), or null when there's nothing to find. */
+function pattern(q, { caseSensitive = false, word = false, regex = false } = {}) {
+  const want = String(q || '');
+  if (!want) return null;
+  let src = regex ? want : want.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (word) src = `(?<![\\w$])(?:${src})(?![\\w$])`;
+  try { return new RegExp(src, caseSensitive ? 'g' : 'gi'); } catch (e) { throw fail('bad_pattern', `That pattern doesn't work: ${e.message.replace(/^Invalid regular expression: /, '')}`); }
+}
+
+/** "*.py, src/**" -> a list of RegExps for file paths. */
+function globs(text) {
+  const list = String(text || '').split(',').map((x) => x.trim()).filter(Boolean);
+  if (!list.length) return null;
+  return list.map((g) => {
+    const body = g.replace(/^\.?\//, '').split('**').map((part) => part.split('*').map((x) => x.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\?/g, '[^/]')).join('[^/]*')).join('.*');
+    return g.includes('/') ? new RegExp(`^${body}(/.*)?$`, 'i') : new RegExp(`(^|/)${body}$`, 'i');
+  });
+}
+
+/** $1, $2… and $& in a replacement, for pattern searches. */
+function expand(rep, m) {
+  const groups = m.slice(0, -2).filter((x) => typeof x !== 'object');
+  return rep.replace(/\$(\d+|&|\$)/g, (all, k) => (k === '$' ? '$' : k === '&' ? groups[0] : groups[+k] !== undefined ? groups[+k] : ''));
+}
+
+module.exports = { pattern, globs, Folder, home, kindOf, mimeOf, ext, asText, HEAVY, HIDDEN, TEXT_MAX };

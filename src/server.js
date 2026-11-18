@@ -11,6 +11,9 @@ const crypto = require('crypto');
 const EventEmitter = require('events');
 const { Folder, mimeOf, kindOf, home } = require('./files');
 const { Runner, plan } = require('./run');
+const { Git } = require('./git');
+const { Terms } = require('./term');
+const { check } = require('./check');
 const AI = require('./ai');
 const Ember = require('./ember');
 const pkg = require('../package.json');
@@ -18,7 +21,11 @@ const pkg = require('../package.json');
 const WEB = path.join(__dirname, '..', 'web');
 const PAGE = path.join(WEB, 'den.html');
 const readJson = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };
-const SETTINGS = { theme: ['dark', 'light'], autosave: ['on', 'off'], wrap: ['auto', 'on', 'off'], tab: ['auto', '2', '4', '8'], size: null, ai: null };
+const THEMES = ['ember', 'dusk', 'moss', 'daylight', 'frost'];
+const SETTINGS = {
+  theme: THEMES.concat(['dark', 'light']), autosave: ['on', 'off'], wrap: ['auto', 'on', 'off'], tab: ['auto', '2', '4', '8'], size: null, ai: null,
+  minimap: ['on', 'off'], guides: ['on', 'off'], check: ['on', 'off'], glass: ['on', 'off'],
+};
 
 const config = {
   file: () => path.join(home(), 'config.json'),
@@ -35,6 +42,9 @@ class Den extends EventEmitter {
     this.folder = new Folder(root);
     this.token = token || crypto.randomBytes(18).toString('base64url');
     this.runner = new Runner();
+    this.git = new Git(this.folder);
+    this.terms = new Terms(this.folder.root);
+    this.terms.on('event', (ev) => this.push(ev));
     this.pages = new Set();
     this.server = null;
     this.port = 0;
@@ -118,6 +128,7 @@ class Den extends EventEmitter {
 
   close() {
     this.runner.stop();
+    this.terms.closeAll();
     if (this.watcher) this.watcher.close();
     for (const res of this.pages) res.end();
     this.pages.clear();
@@ -209,7 +220,12 @@ class Den extends EventEmitter {
           case 'list': return this._send(res, 200, { ok: true, items: F.list(q.path || '') });
           case 'files': return this._send(res, 200, { ok: true, files: F.files() });
           case 'read': return this._send(res, 200, { ok: true, file: F.read(q.path), runnable: this.runnable(q.path) });
-          case 'search': return this._send(res, 200, { ok: true, ...F.search(q.q, { caseSensitive: q.case === '1' }) });
+          case 'search': return this._send(res, 200, { ok: true, ...F.search(q.q, { caseSensitive: q.case === '1', word: q.word === '1', regex: q.regex === '1', include: q.include || '' }) });
+          case 'git/status': return this._send(res, 200, { ok: true, ...(await this.git.status()) });
+          case 'git/base': return this._send(res, 200, { ok: true, text: await this.git.base(q.path) });
+          case 'git/branches': return this._send(res, 200, { ok: true, ...(await this.git.branches()) });
+          case 'git/log': return this._send(res, 200, { ok: true, ...(await this.git.log(Number(q.n) || 30)) });
+          case 'term/list': return this._send(res, 200, { ok: true, pty: this.terms.pty, items: this.terms.info() });
           case 'bin': return this._send(res, 200, { ok: true, items: F.bin() });
           case 'history': return this._send(res, 200, { ok: true, items: F.history(q.path) });
           case 'version': return this._send(res, 200, { ok: true, text: F.version(q.path, q.id) });
@@ -278,11 +294,63 @@ class Den extends EventEmitter {
           return this._send(res, 200, { ok: true });
         }
         case 'ask': return this._ask(req, res, m);
+        case 'replace': {
+          const r = F.replace(m.q, m.with, { caseSensitive: !!m.case, word: !!m.word, regex: !!m.regex, include: m.include || '', paths: m.paths || null });
+          if (r.count) this.emit('log', `replaced ${r.count} in ${r.files.length} file${r.files.length === 1 ? '' : 's'}`);
+          return this._send(res, 200, { ok: true, ...r });
+        }
+        case 'upload': {
+          const r = F.upload(m.dir, m.name, m.data);
+          this.emit('log', `added ${r.path}`);
+          return this._send(res, 200, { ok: true, ...r });
+        }
+        case 'check': {
+          if ((config.load().settings || {}).check === 'off') return this._send(res, 200, { ok: true, problems: null });
+          const problems = await check(String(m.path || ''), m.text, String(m.lang || ''));
+          return this._send(res, 200, { ok: true, problems });
+        }
+        case 'git/stage': return this._send(res, 200, { ok: true, ...(await this.git.stage(m.paths)) });
+        case 'git/unstage': return this._send(res, 200, { ok: true, ...(await this.git.unstage(m.paths)) });
+        case 'git/discard': {
+          const r = await this.git.discard(m.paths);
+          this.emit('log', `undid changes to ${(m.paths || []).length} file${(m.paths || []).length === 1 ? '' : 's'}`);
+          return this._send(res, 200, { ok: true, ...r });
+        }
+        case 'git/commit': {
+          const r = await this.git.commit(m.message);
+          this.emit('log', `committed ${r.hash}`);
+          return this._send(res, 200, { ok: true, ...r });
+        }
+        case 'git/identity': return this._send(res, 200, { ok: true, ...(await this.git.identity(m.name, m.email)) });
+        case 'git/push': { const r = await this.git.push(); this.emit('log', 'pushed'); return this._send(res, 200, { ok: true, ...r }); }
+        case 'git/pull': { const r = await this.git.pull(); this.emit('log', 'pulled'); return this._send(res, 200, { ok: true, ...r }); }
+        case 'git/connect': return this._send(res, 200, { ok: true, ...(await this.git.connect(m.url)) });
+        case 'git/checkout': return this._send(res, 200, { ok: true, ...(await this.git.checkout(m.branch, !!m.create)) });
+        case 'git/init': { const r = await this.git.init(); this.emit('log', 'started tracking changes with git'); return this._send(res, 200, { ok: true, ...r }); }
+        case 'git/message': return this._send(res, 200, await this._commitMessage());
+        case 'term/open': {
+          const cwd = m.path ? F.abs(m.path) : null;
+          return this._send(res, 200, { ok: true, ...this.terms.open({ cols: m.cols, rows: m.rows, cwd: cwd && fs.existsSync(cwd) && fs.statSync(cwd).isDirectory() ? cwd : null }) });
+        }
+        case 'term/input': return this._send(res, 200, { ok: this.terms.input(m.id, String(m.data || '').slice(0, 100000)) });
+        case 'term/resize': return this._send(res, 200, { ok: this.terms.resize(m.id, m.cols, m.rows) });
+        case 'term/close': return this._send(res, 200, { ok: this.terms.close(m.id) });
         default: return this._send(res, 404, { ok: false, error: 'not found' });
       }
     } catch (e) {
       return this._send(res, 200, { ok: false, code: e.code || null, error: e.message });
     }
+  }
+
+  async _commitMessage() {
+    const choice = (config.load().settings || {}).ai || null;
+    const { model } = await AI.current(choice);
+    if (!model) return { ok: false, code: 'no_ai', error: 'Writing commit messages needs Ember\'s AI (set it up in the Ask tab).' };
+    const diff = await this.git.changes();
+    if (!diff.trim()) return { ok: false, code: 'nothing', error: 'There is nothing new to describe.' };
+    const r = await AI.complete({ model, system: AI.COMMIT, user: `The changes:\n${diff}` });
+    const line = r.text.replace(/```[\s\S]*?```/g, '').split('\n').map((x) => x.trim().replace(/^["'`]+|["'`.]+$/g, '').replace(/^(feat|fix|chore|docs|refactor|style|test)(\([^)]*\))?:\s*/i, '')).find(Boolean) || '';
+    return { ok: !!line, message: line.slice(0, 100), error: line ? null : 'No message came back. Try again.' };
   }
 
   runnable(rel) {
@@ -302,7 +370,8 @@ class Den extends EventEmitter {
     return {
       ok: true, version: pkg.version, name: this.folder.name, where: shown, branch: this.folder.branch(),
       preview: `http://127.0.0.1:${this.previewPort}/${this.token}/raw/`,
-      platform: process.platform, settings: c.settings || {}, running: this.runner.job ? { label: this.runner.job.label } : null,
+      platform: process.platform, settings: c.settings || {}, running: this.runner.job ? { label: this.runner.job.label } : null, pty: this.terms.pty,
+      home: shown.startsWith('~') ? '~' : null, root: this.folder.root,
       ember: Ember.web(),
     };
   }
@@ -363,11 +432,14 @@ class Den extends EventEmitter {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
     res.write(`data: ${JSON.stringify({ t: 'hello', running: this.runner.job ? { id: this.runner.job.id, label: this.runner.job.label } : null })}\n\n`);
     this.pages.add(res);
+    clearTimeout(this._orphans);
     this.emit('pages', this.pages.size);
     const ping = setInterval(() => res.write(': ping\n\n'), 15000);
     req.on('close', () => {
       clearInterval(ping);
       this.pages.delete(res);
+      // with no page open for a while, its terminals are closed (a reload picks them back up)
+      if (!this.pages.size) { clearTimeout(this._orphans); this._orphans = setTimeout(() => this.terms.closeAll(), 3 * 60 * 1000); this._orphans.unref(); }
       this.emit('pages', this.pages.size);
     });
   }
