@@ -1,4 +1,4 @@
-/* den 2: floating panes of frosted glass over a softly lit sky. Every view has
+/* den 2: floating panes of glass over a living pixel forest. Every view has
    its own colour (files amber, search sky, changes moss, outline violet,
    Ember coral), so you always know where you are. */
 
@@ -78,12 +78,10 @@ kbd { font-size: .82em; color: var(--dim); border: 1px solid var(--edge); border
 svg.i { width: 18px; height: 18px; flex: none; display: block; }
 svg.fi { width: 16px; height: 16px; flex: none; display: block; }
 
-/* the sky behind everything */
-.sky { position: fixed; inset: 0; overflow: hidden; pointer-events: none; contain: strict; }
-.sky i { position: absolute; border-radius: 50%; filter: blur(70px); opacity: var(--blob); }
-.sky .b1 { width: 55vw; height: 55vw; left: -12vw; top: -18vw; background: radial-gradient(circle, var(--b1), transparent 68%); }
-.sky .b2 { width: 50vw; height: 50vw; right: -14vw; top: 8vh; background: radial-gradient(circle, var(--b2), transparent 68%); }
-.sky .b3 { width: 46vw; height: 46vw; left: 28vw; bottom: -26vw; background: radial-gradient(circle, var(--b3), transparent 68%); }
+/* a pixel forest behind everything: night in the dark colours, day in the
+   light ones. It holds still while you type. */
+.sky { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; image-rendering: pixelated; opacity: .9; }
+:root[data-theme="daylight"] .sky, :root[data-theme="frost"] .sky { opacity: .62; }
 
 /* The panes are see-through without blurring what's behind them: the sky is
    already soft, so it looks the same and typing stays quick. Pop-ups (menus,

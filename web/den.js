@@ -92,10 +92,21 @@
   app.ember = ember;
 
   // ── settings ────────────────────────────────────────────────────────
+  // the forest behind everything: night for the dark colours, day for the light ones
+  var forest = null;
+  var NIGHT = { ember: 1, dusk: 1, moss: 1 };
+  function scene() {
+    if (!window.Forest) return;
+    if (!forest) {
+      forest = Forest.start($('forest'), { night: function () { return !!NIGHT[settings.theme]; }, clear: [0.22, 0.78], share: 0.46, fps: 15, mascot: 'fox' });
+      document.addEventListener('keydown', function () { forest.hush(900); }, true); // typing comes first
+    } else forest.redraw();
+  }
   function applySettings() {
     var root = document.documentElement;
     root.setAttribute('data-theme', settings.theme);
     root.classList.toggle('flat', settings.glass === 'off');
+    scene();
     root.style.setProperty('--size', (settings.size || 14) + 'px');
     groups.forEach(function (g) {
       g.editor.metrics();
