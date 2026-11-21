@@ -98,7 +98,7 @@
   function scene() {
     if (!window.Forest) return;
     if (!forest) {
-      forest = Forest.start($('forest'), { night: function () { return !!NIGHT[settings.theme]; }, clear: [0.22, 0.78], share: 0.46, fps: 15, mascot: 'fox' });
+      forest = Forest.start($('forest'), { night: function () { return !!NIGHT[settings.theme]; }, clear: [0.22, 0.78], share: 0.5, fps: 15, mascot: 'fox', scene: 'closeup' });
       document.addEventListener('keydown', function () { forest.hush(900); }, true); // typing comes first
     } else forest.redraw();
   }
